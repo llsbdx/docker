@@ -18,7 +18,7 @@ RUN cat /hadoop_env >>/etc/profile
 #open port
 EXPOSE 22
 EXPOSE 8088
-
+EXPOSE 50070
 #set start commond
 CMD ["/run.sh"]
 
