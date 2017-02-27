@@ -1,0 +1,127 @@
+ 配置与使用Hadoop的问题
+2013-07-25 14:36 3005人阅读 评论(0) 收藏 举报
+分类：
+并行计算（13） Linux（18）
+
+版权声明：本文为博主原创文章，未经博主允许不得转载。
+
+1.用户组对数据目录必须拥有写权限
+
+chmod g-w /Hadoop/data/ 或者 chmod 755 /hadoop/data
+
+2.单机模式下，output和input文件夹在本机上，而在伪分布模式下，必须位于hdfs文件系统中，否则报错：Input path does not exist
+
+方法一：
+
+建立本地目录：mkdir input
+
+拷贝文件至目录：cp conf/* input
+
+将本地目录input上传到HDFS文件系统上：hadoop fs -put input/ input
+
+方法二：
+
+在dfs中创建input目录：hadoop dfs -mkdir input 
+
+将本地conf中的文件拷贝到dfs中的input：hadoop dfs -copyFromLocal conf/* input
+
+
+方法三：
+
+将本地目录conf上传到HDFS文件系统上：hadoop dfs -put conf input
+
+
+方法四：
+
+将输入路径设为本地文件夹（而不是hdfs上的文件夹）：FileInputFormat.setInputPaths(conf, new Path("input"));
+
+
+查看任务的执行结果：hadoop dfs -cat output/*
+
+将执行结果从hdfs下载至本地：hadoop dfs -get output/ output
+
+
+3.输出文件夹不能是已存在的，因此每次运行应设置不同的输出文件夹名，或者先删除已存在的输出文件夹（之前的数据会丢失）。
+
+hadoop dfs -rmr output
+
+
+4.多次格式化时需要删除本机上的存储目录(data,name)和缓存目录(tmp)
+
+
+其他可能遇到的问题及解决：
+
+1）sudo /etc/init.d/iptables stop关闭防火墙，或：service iptables stop(立即生效)，chkconfig iptables off(重启后生效)
+
+1）df -hl查看系统空间是否足够
+
+2）jps查看进程：服务是否都启动了，datanode数（为2）
+
+3）是否在safemode下：hadoop dfsadmin -safemode leave，离开sofemode
+
+4） hadoop dfsadmin -report
+
+5）不用start-all.sh启动全部服务，而是单独先后启动服务：
+
+    hadoop-daemon.sh start namenode
+    hadoop-daemon.sh start datanode 
+    hadoop-daemon.sh start secondarynamenode
+    hadoop-daemon.sh start jobtracker
+    hadoop-daemon.sh start tasktracker
+
+6）查看启动日志（我的启动日志位于/usr/local/hadoop/logs文件夹下）：hadoop-root-datanode-localhost.log
+
+可在日志文件中定位和查看错误原因。
+
+
+以下为转载：
+
+1.某些节点出现running asprocess XXX. Stop it first
+
+这是由于各节点登录用户为root，在启动hadoop前，务必将各节点用户切换至普通用户hadoop下，切换后的启动效果如下：从图中可以看出hadoop集群中服务的启动顺序：namenode、datanode、secondarynamenode、jobtracker以及tasktracker；
+
+
+2.某节点namenode/tasktracker自动关闭
+
+关闭该节点防火墙，serviceiptables stop(立即生效)、chkconfig iptables off(重启后生效)；
+
+
+3.某节点jps命令无效
+
+JDK环境变量为配置成功。JPS在/usr/Java/XXX/bin下，将其加入到/etc/profile中。
+
+
+4.多次格式化HDFS注意事项
+
+先将每个节点上的/usr/hadoop/tmp文件夹删除，这是因为每次格式化的时候会重新创建一个NamenodeID，而/tmp/dfs/data下包含了上次格式化的NamenodeID，hadoopnamenode –format会清空namenode下的数据，但是不能同时清空datanode的数据，所以格式化前，先将所有的tmp清空。
+
+
+5.JobTracker is in safe mode
+
+这表示JobTracker处于安全模式，用hadoop dfsadmin –safemode leave退出安全模式。
+
+
+6.Can not start tasktracker becausejava.NET.BindException:Address already in use
+
+这表明某端口正被使用，查看日志获得端口号port，并通过ps –ef|grep port查看端口被哪个进程占用，关闭该进程，有时关闭该进程后重启计算机才能解决。
+
+
+7.Error: Java heap space
+    这表明JVM内存不够，在mapred-site.xml中设置属性mapred.child.java.opts，可以设为-Xmx1024M，这里设置的值最好是物理内存的一半。
+
+B
+B
+B
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+
